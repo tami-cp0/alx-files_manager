@@ -48,9 +48,6 @@ class AuthController {
   static async getDisconnect(req, res) {
     // Retrieve token from request headers
     const token = req.get('X-Token');
-    if (!token) {
-      return res.status(400).json({ error: 'Token missing' });
-    }
 
     // Get user ID from Redis using token
     const id = new ObjectId(await redisClient.get(`auth_${token}`));
