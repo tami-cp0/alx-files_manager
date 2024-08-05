@@ -107,7 +107,6 @@ class FilesController {
           type,
           isPublic,
           parentId,
-          localPath: filePath,
         };
       } catch (err) {
         throw new Error(err);
