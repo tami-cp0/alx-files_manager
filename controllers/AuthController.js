@@ -55,7 +55,7 @@ class AuthController {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // Find user in the database
+    // ensure id is linked to a real user
     const user = await dbClient.users.findOne({ _id: id });
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' });

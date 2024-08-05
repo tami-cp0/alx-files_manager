@@ -24,7 +24,13 @@ router.get('/connect', AuthController.getConnect);
 // disconnect the user from the server
 router.get('/disconnect', AuthController.getDisconnect);
 
-//
+// upload a new file or folder
 router.post('/files', FilesController.postUpload);
+
+//
+router.get('/files/:id', FilesController.getShow);
+
+//
+router.get('/files', FilesController.getIndex);
 
 export default router;

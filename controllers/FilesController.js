@@ -24,6 +24,9 @@ class FilesController {
       data,
     } = req.body;
 
+    // list of accepted types
+    const acceptedType = ['folder', 'file', 'image'];
+
     // The two optional values
     let { parentId, isPublic } = req.body;
 
@@ -31,8 +34,8 @@ class FilesController {
     if (!isPublic) { isPublic = false; }
 
     if (!name) { return res.status(400).send({ error: 'Missing name' }); }
-    if (!type) { return res.status(400).send({ error: 'Missing type' }); }
-    if (!data) { return res.status(400).send({ error: 'Missing data' }); }
+    if (!type || !acceptedType.includes(type)) { return res.status(400).send({ error: 'Missing type' }); }
+    if (!data && type !== 'folder') { return res.status(400).send({ error: 'Missing data' }); }
 
     if (parentId) {
       const _id = new ObjectId(parentId);
@@ -114,6 +117,60 @@ class FilesController {
     }
 
     return res.status(201).json(document);
+  }
+
+  static async getShow(req, res) {
+    const token = req.get('X-Token');
+
+    // Get user ID from Redis using token
+    const userId = new ObjectId(await redisClient.get(`auth_${token}`));
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // ensure id is linked to a real user
+    const user = await dbClient.users.findOne({ _id: userId });
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    let fileId;
+
+    try {
+      fileId = new ObjectId(req.params.id);
+    } catch (err) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const result = await dbClient.files.findOne({ _id: fileId, userId });
+    if (!result) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    return res.status(200).json(result);
+  }
+
+  static async getIndex(req, res) {
+    const token = req.get('X-Token');
+
+    // Get user ID from Redis using token
+    const userId = new ObjectId(await redisClient.get(`auth_${token}`));
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // ensure id is linked to a real user
+    const user = await dbClient.users.findOne({ _id: userId });
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { parentId, page } = req.query;
+
+    const file = await dbClient.files.findOne({ parentId });
+    if (!file) {
+      return res.status(200).json([]);
+    }
   }
 }
 
