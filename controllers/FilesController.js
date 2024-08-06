@@ -68,7 +68,7 @@ class FilesController {
           parentId,
         };
       } catch (err) {
-        throw new Error(err);
+        console.log(err);
       }
     } else {
       const folderPath = process.env.FOLDER_PATH || '/tmp/files_manager';
@@ -80,7 +80,7 @@ class FilesController {
         try {
           fs.mkdirSync(folderPath, { recursive: true });
         } catch (mkdirErr) {
-          throw new Error(mkdirErr);
+          console.log(mkdirErr);
         }
       }
 
@@ -90,7 +90,7 @@ class FilesController {
       try {
         fs.writeFileSync(filePath, fileData); // Write the file
       } catch (writeErr) {
-        throw new Error(writeErr);
+        console.log(writeErr);
       }
 
       try {
@@ -112,7 +112,7 @@ class FilesController {
           parentId,
         };
       } catch (err) {
-        throw new Error(err);
+        console.log(err);
       }
     }
 
@@ -165,12 +165,26 @@ class FilesController {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { parentId, page } = req.query;
+    const parentId = req.query.parentId || 0;
+    const page = parseInt(req.query.page, 10) || 0;
 
-    const file = await dbClient.files.findOne({ parentId });
+    const file = await dbClient.files.find({ parentId });
     if (!file) {
       return res.status(200).json([]);
     }
+
+    const pageSize = 20;
+    const skip = page * pageSize;
+    const limit = pageSize;
+
+    const pipeline = [
+      { $skip: skip },
+      { $limit: limit },
+    ];
+
+    const results = await dbClient.files.aggregate(pipeline).toArray();
+
+    return res.status(200).json(results);
   }
 }
 
