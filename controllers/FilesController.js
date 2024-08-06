@@ -143,8 +143,10 @@ class FilesController {
       return res.status(404).json({ error: 'Not found' });
     }
 
-    const result = await dbClient.files.findOne({ _id: fileId, userId });
-    console.log(userId);
+    const result = await dbClient.files.findOne(
+      { _id: fileId, userId },
+      { projection: { localPath: 0 } },
+    );
     if (!result) {
       return res.status(404).json({ error: 'Not found' });
     }
@@ -183,6 +185,7 @@ class FilesController {
     const pipeline = [
       { $skip: skip },
       { $limit: limit },
+      { $project: { localPath: 0 } },
     ];
 
     const results = await dbClient.files.aggregate(pipeline).toArray();
@@ -200,18 +203,64 @@ class FilesController {
     }
 
     // ensure id is linked to a real user
-    const _id = new ObjectId(userId);
+    let _id = new ObjectId(userId);
     const user = await dbClient.users.findOne({ _id });
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const files = await dbClient.files.find({ userId });
+    // set _id to the id in params which is the file id
+    _id = new ObjectId(req.params.id);
+    const files = await dbClient.files.findOne({ _id, userId });
     if (!files) {
       return res.status(404).json({ error: 'Not found' });
     }
 
-    return res;
+    const filter = { isPublic: false };
+    const update = { $set: { isPublic: true } };
+    await dbClient.files.updateOne(filter, update);
+
+    const document = await dbClient.files.findOne(
+      { _id, userId },
+      { projection: { localPath: 0 } },
+    );
+
+    return res.status(200).json(document);
+  }
+
+  static async putUnpublish(req, res) {
+    const token = req.get('X-Token');
+
+    // Get user ID from Redis using token
+    const userId = await redisClient.get(`auth_${token}`);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // ensure id is linked to a real user
+    let _id = new ObjectId(userId);
+    const user = await dbClient.users.findOne({ _id });
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // set _id to the id in params which is the file id
+    _id = new ObjectId(req.params.id);
+    const file = await dbClient.files.findOne({ _id, userId });
+    if (!file) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+    const filter = { isPublic: true };
+    const update = { $set: { isPublic: false } };
+    await dbClient.files.updateOne(filter, update);
+
+    const document = await dbClient.files.findOne(
+      { _id, userId },
+      { projection: { localPath: 0 } },
+    );
+
+    return res.status(200).json(document);
   }
 }
 
