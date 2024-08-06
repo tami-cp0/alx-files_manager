@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { ObjectId } from 'mongodb';
+import mime from 'mime-types';
 import dbClient from '../utils/db';
 import redisClient from '../utils/redis';
 
@@ -143,13 +144,19 @@ class FilesController {
       return res.status(404).json({ error: 'Not found' });
     }
 
-    const result = await dbClient.files.findOne(
+    let result = await dbClient.files.findOne(
       { _id: fileId, userId },
       { projection: { localPath: 0 } },
     );
     if (!result) {
       return res.status(404).json({ error: 'Not found' });
     }
+
+    result = {
+      id: result._id,
+      ...result,
+    };
+    delete result._id;
 
     return res.status(200).json(result);
   }
@@ -188,7 +195,14 @@ class FilesController {
       { $project: { localPath: 0 } },
     ];
 
-    const results = await dbClient.files.aggregate(pipeline).toArray();
+    let results = await dbClient.files.aggregate(pipeline).toArray();
+    results = results.map((document) => {
+      const { _id, ...rest } = document;
+      return {
+        id: _id,
+        ...rest,
+      };
+    });
 
     return res.status(200).json(results);
   }
@@ -210,9 +224,14 @@ class FilesController {
     }
 
     // set _id to the id in params which is the file id
-    _id = new ObjectId(req.params.id);
-    const files = await dbClient.files.findOne({ _id, userId });
-    if (!files) {
+    try {
+      _id = new ObjectId(req.params.id);
+    } catch (err) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+    const file = await dbClient.files.findOne({ _id, userId });
+    if (!file) {
       return res.status(404).json({ error: 'Not found' });
     }
 
@@ -220,10 +239,16 @@ class FilesController {
     const update = { $set: { isPublic: true } };
     await dbClient.files.updateOne(filter, update);
 
-    const document = await dbClient.files.findOne(
+    let document = await dbClient.files.findOne(
       { _id, userId },
       { projection: { localPath: 0 } },
     );
+
+    document = {
+      id: document._id,
+      ...document,
+    };
+    delete document._id;
 
     return res.status(200).json(document);
   }
@@ -245,7 +270,12 @@ class FilesController {
     }
 
     // set _id to the id in params which is the file id
-    _id = new ObjectId(req.params.id);
+    try {
+      _id = new ObjectId(req.params.id);
+    } catch (err) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
     const file = await dbClient.files.findOne({ _id, userId });
     if (!file) {
       return res.status(404).json({ error: 'Not found' });
@@ -255,12 +285,65 @@ class FilesController {
     const update = { $set: { isPublic: false } };
     await dbClient.files.updateOne(filter, update);
 
-    const document = await dbClient.files.findOne(
+    let document = await dbClient.files.findOne(
       { _id, userId },
       { projection: { localPath: 0 } },
     );
 
+    document = {
+      id: document._id,
+      ...document,
+    };
+    delete document._id;
+
     return res.status(200).json(document);
+  }
+
+  static async getFile(req, res) {
+    const token = req.get('X-Token');
+
+    // Get user ID from Redis using token
+    const userId = await redisClient.get(`auth_${token}`);
+
+    // get the user attached to the id
+    let _id = new ObjectId(userId);
+    const user = await dbClient.users.findOne({ _id });
+
+    // set _id to the id in params which is the file id
+    try {
+      _id = new ObjectId(req.params.id);
+    } catch (err) {
+      return res.status(404).json({ error: 'Not founda' });
+    }
+
+    const file = await dbClient.files.findOne({ _id, userId });
+
+    if (!file.isPublic && (!user || !userId)) {
+      return res.status(404).json({ error: 'Not foundb' });
+    }
+
+    if (file.type === 'folder') {
+      return res.status(400).json({ error: 'A folder doesn\'t have content' });
+    }
+
+    // If the file is not locally present, return an error
+    try {
+      fs.accessSync(file.localPath, fs.constants.F_OK); // Check if file exists
+    } catch (err) {
+      return res.status(404).json({ error: 'Not foundc' });
+    }
+
+    const mimeType = mime.lookup(file.name);
+    res.setHeader('Content-Type', mimeType);
+
+    let content;
+    try {
+      content = fs.readFileSync(file.localPath, 'utf8');
+    } catch (err) {
+      console.log(err);
+    }
+
+    return res.status(200).send(content);
   }
 }
 

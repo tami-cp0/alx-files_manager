@@ -33,10 +33,13 @@ router.get('/files/:id', FilesController.getShow);
 // get all the users files
 router.get('/files', FilesController.getIndex);
 
-//
+// Publicize a file
 router.put('/files/:id/publish', FilesController.putPublish);
 
-//
+// Unpublicize a file
 router.put('/files/:id/unpublish', FilesController.putUnpublish);
+
+//
+router.get('/files/:id/data', FilesController.getFile);
 
 export default router;
