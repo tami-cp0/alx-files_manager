@@ -27,10 +27,16 @@ router.get('/disconnect', AuthController.getDisconnect);
 // upload a new file or folder
 router.post('/files', FilesController.postUpload);
 
-//
+// get a user's specific file
 router.get('/files/:id', FilesController.getShow);
 
-//
+// get all the users files
 router.get('/files', FilesController.getIndex);
+
+//
+router.put('/files/:id/publish', FilesController.putPublish);
+
+//
+// router.put('/files/:id/unpublish', FilesController.putUnpublish);
 
 export default router;

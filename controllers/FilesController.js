@@ -123,13 +123,14 @@ class FilesController {
     const token = req.get('X-Token');
 
     // Get user ID from Redis using token
-    const userId = new ObjectId(await redisClient.get(`auth_${token}`));
+    const userId = await redisClient.get(`auth_${token}`);
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
     // ensure id is linked to a real user
-    const user = await dbClient.users.findOne({ _id: userId });
+    const _id = new ObjectId(userId);
+    const user = await dbClient.users.findOne({ _id });
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -139,12 +140,13 @@ class FilesController {
     try {
       fileId = new ObjectId(req.params.id);
     } catch (err) {
-      return res.status(401).json({ error: 'Unauthorized' });
+      return res.status(404).json({ error: 'Not found' });
     }
 
     const result = await dbClient.files.findOne({ _id: fileId, userId });
+    console.log(userId);
     if (!result) {
-      return res.status(401).json({ error: 'Unauthorized' });
+      return res.status(404).json({ error: 'Not found' });
     }
 
     return res.status(200).json(result);
@@ -154,13 +156,14 @@ class FilesController {
     const token = req.get('X-Token');
 
     // Get user ID from Redis using token
-    const userId = new ObjectId(await redisClient.get(`auth_${token}`));
+    const userId = await redisClient.get(`auth_${token}`);
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
     // ensure id is linked to a real user
-    const user = await dbClient.users.findOne({ _id: userId });
+    const _id = new ObjectId(userId);
+    const user = await dbClient.users.findOne({ _id });
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -168,8 +171,8 @@ class FilesController {
     const parentId = req.query.parentId || 0;
     const page = parseInt(req.query.page, 10) || 0;
 
-    const file = await dbClient.files.find({ parentId });
-    if (!file) {
+    const files = await dbClient.files.find({ parentId });
+    if (!files) {
       return res.status(200).json([]);
     }
 
@@ -185,6 +188,30 @@ class FilesController {
     const results = await dbClient.files.aggregate(pipeline).toArray();
 
     return res.status(200).json(results);
+  }
+
+  static async putPublish(req, res) {
+    const token = req.get('X-Token');
+
+    // Get user ID from Redis using token
+    const userId = await redisClient.get(`auth_${token}`);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // ensure id is linked to a real user
+    const _id = new ObjectId(userId);
+    const user = await dbClient.users.findOne({ _id });
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const files = await dbClient.files.find({ userId });
+    if (!files) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+    return res;
   }
 }
 
