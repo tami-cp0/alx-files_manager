@@ -312,9 +312,8 @@ class FilesController {
 
     // get the user attached to the id
     let _id = new ObjectId(userId);
-    let user;
     try {
-      user = await dbClient.users.findOne({ _id });
+      await dbClient.users.findOne({ _id });
     } catch (err) {
       return res.status(404).json({ error: 'Not found' });
     }
@@ -330,7 +329,7 @@ class FilesController {
 
     try {
       const file = await dbClient.files.findOne({ _id, userId });
-      if (!file.isPublic && (!user || !userId)) {
+      if (!file || (!file.isPublic && file.userId !== userId)) {
         return res.status(404).json({ error: 'Not found' });
       }
 
