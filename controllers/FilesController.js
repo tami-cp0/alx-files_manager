@@ -303,44 +303,58 @@ class FilesController {
     const token = req.get('X-Token');
 
     // Get user ID from Redis using token
-    const userId = await redisClient.get(`auth_${token}`);
+    let userId;
+    try {
+      userId = await redisClient.get(`auth_${token}`);
+    } catch (err) {
+      return res.status(404).json({ error: 'Not found' });
+    }
 
     // get the user attached to the id
     let _id = new ObjectId(userId);
-    const user = await dbClient.users.findOne({ _id });
+    let user;
+    try {
+      user = await dbClient.users.findOne({ _id });
+    } catch (err) {
+      return res.status(404).json({ error: 'Not found' });
+    }
 
     // set _id to the id in params which is the file id
     try {
       _id = new ObjectId(req.params.id);
     } catch (err) {
-      return res.status(404).json({ error: 'Not founda' });
+      return res.status(404).json({ error: 'Not found' });
     }
-
-    const file = await dbClient.files.findOne({ _id, userId });
-
-    if (!file.isPublic && (!user || !userId)) {
-      return res.status(404).json({ error: 'Not foundb' });
-    }
-
-    if (file.type === 'folder') {
-      return res.status(400).json({ error: 'A folder doesn\'t have content' });
-    }
-
-    // If the file is not locally present, return an error
-    try {
-      fs.accessSync(file.localPath, fs.constants.F_OK); // Check if file exists
-    } catch (err) {
-      return res.status(404).json({ error: 'Not foundc' });
-    }
-
-    const mimeType = mime.lookup(file.name);
-    res.setHeader('Content-Type', mimeType);
 
     let content;
+
     try {
-      content = fs.readFileSync(file.localPath, 'utf8');
+      const file = await dbClient.files.findOne({ _id, userId });
+      if (!file.isPublic && (!user || !userId)) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+
+      if (file.type === 'folder') {
+        return res.status(400).json({ error: 'A folder doesn\'t have content' });
+      }
+
+      // If the file is not locally present, return an error
+      try {
+        fs.accessSync(file.localPath, fs.constants.F_OK); // Check if file exists
+      } catch (err) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+
+      const mimeType = mime.lookup(file.name);
+      res.setHeader('Content-Type', mimeType);
+
+      try {
+        content = fs.readFileSync(file.localPath, 'utf8');
+      } catch (err) {
+        console.log(err);
+      }
     } catch (err) {
-      console.log(err);
+      return res.status(404).json({ error: 'Not found' });
     }
 
     return res.status(200).send(content);
