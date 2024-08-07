@@ -47,7 +47,6 @@ class FilesController {
       // check parentId
       const _id = new ObjectId(parentId);
       const result = await dbClient.files.findOne({ _id });
-      console.log(result);
       if (!result) { return res.status(400).json({ error: 'Parent not found' }); }
       if (result.type !== 'folder') {
         return res.status(400).json({ error: 'Parent is not a folder' });
